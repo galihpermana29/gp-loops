@@ -6,6 +6,9 @@ You write tickets. The loop picks up each one in a fresh `claude --print` proces
 verifies it, commits, and moves to the next. Every iteration starts with an empty context window,
 so nothing carries over except what is written to disk.
 
+<img width="1583" height="758" alt="image" src="https://github.com/user-attachments/assets/8d1b7add-4642-475b-8581-3b504dd99c8d" />
+
+
 ---
 
 ## ⚠️ Read this before installing
