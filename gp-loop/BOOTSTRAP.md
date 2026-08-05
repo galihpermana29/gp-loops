@@ -16,7 +16,7 @@ and reports what it changed. The judgement calls below are what it deliberately 
 ```bash
 brew install beads          # bd, the queue — github.com/gastownhall/beads
 brew install beads_viewer   # bv, read-only TUI (optional)
-npm i -g beads-ui           # bdui, the web board (optional)
+npm i -g beads-ui           # bdui, the board you write and triage tickets on
 ```
 
 `bootstrap.sh` checks for these and prints the install line for anything missing. It will not
@@ -86,9 +86,34 @@ What it does, so you can undo one part without unpicking the rest:
 - **Starters.** Writes an `AGENTS.md` into each repo and a `CONTEXT.md` at the workspace root, if
   they are absent. Both are excluded from git, so they reach nobody until you decide otherwise.
   Commit them yourself once you have read them — most projects eventually want `AGENTS.md` shared.
+- **`AGENTS.md`.** Offers to fill it in by reading the repo, for any repo whose copy is missing or
+  still the empty skeleton. See below.
 - **Skills.** Checks the six the workflow uses and offers to install the missing ones.
 
 Verify: `bd ready` works from inside a repo, and `git status` in that repo is unchanged.
+
+### Generating `AGENTS.md`
+
+The starter is a skeleton of empty sections, and an empty one is close to useless: the loop's prompt
+tells every iteration to *"follow the conventions in this repo's `AGENTS.md`"*, so a blank file makes
+that a silent no-op and the agent invents conventions for a codebase it has never seen.
+
+So the bootstrap offers to write a real one, by reading the repo. It takes a minute or two per repo,
+and it is skipped entirely under `--check`.
+
+Two things about how it runs:
+
+- **The generator cannot write anything.** It runs with `--allowed-tools "Read,Glob,Grep"` and prints
+  to stdout; the bootstrap writes the file. Setup stays well clear of the permissions trade the loop
+  itself asks you to make.
+- **It is forbidden from inventing a verify command.** It may only name commands it actually found in
+  `package.json`, a `Makefile` or the equivalent, and must say plainly when the project has no test
+  suite rather than dressing a typecheck up as one. A fabricated verify command would be the worst
+  possible outcome, because the loop gates its completion promise on that command exiting zero.
+
+**Read what it produces before relying on it.** It is a well-informed first draft, not a specification
+of your house style, and the conventions section is where it is most likely to overreach. It lands
+git-excluded like the starter, so nothing reaches your collaborators until you commit it.
 
 ## 5. The skills
 

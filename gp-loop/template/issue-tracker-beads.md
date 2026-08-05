@@ -34,7 +34,7 @@ Run `bd prime` once at the start of a session for the full command reference and
 
 ## Conventions
 
-- Every issue carries a `repo:<name>` label naming the repo it targets, for example `repo:foodie-web`.
+- Every issue carries a `repo:<name>` label naming the repo it targets, for example `repo:web`.
   The database is shared across all repos in the workspace, so this label is what scopes work back to a codebase.
 - A **spec is a document, not an issue**.
   Specs live at `.scratch/<feature-slug>/spec.md` inside the target repo, kept out of commits via `.git/info/exclude`.
@@ -79,7 +79,7 @@ bd show <id>                      # what blocks this, and what it blocks
 ```
 
 Cross-repo edges are ordinary edges.
-A `repo:foodie-web` ticket may depend on a `repo:maul-backend` ticket, and this is the main reason the database is shared rather than per-repo.
+A `repo:web` ticket may depend on a `repo:api` ticket, and this is the main reason the database is shared rather than per-repo.
 
 ## Wayfinding operations
 
