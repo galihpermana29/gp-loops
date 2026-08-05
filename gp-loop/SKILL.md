@@ -34,6 +34,13 @@ Read it, then take one of two branches:
 If the directory is not obviously the workspace root, ask which directory it is. That, and the ticket
 prefix, are the only two things the user has to decide.
 
+**Acting on their behalf covers setup, not long-running processes.** Anything that keeps running after
+you stop — a server, a watcher, a daemon, and the loop itself — is offered and waited on, never
+started because a document mentioned it. Setup commands finish, report, and leave nothing behind;
+those are the ones to just run. This matters more here than in most skills, because the loop asks
+people to work with permission prompts bypassed, so an unwanted background process gets no second
+chance to be declined.
+
 ## The runbook
 
 ### 1. Prepare the branch
@@ -52,15 +59,24 @@ Done when: the target repo is on a task branch with a clean tree.
 
 ### 2. Grill, spec, tickets — one session
 
-Start the board. It is where tickets get written, where the dependency graph is legible, and where
-you open the gate later, so it is the first thing up rather than an optional extra:
+Create a seed ticket holding whatever context you have. A rough one is fine; the grill sharpens it.
+Either way of writing it is fine:
 
 ```bash
-bdui start                        # read-write board at 127.0.0.1:3000
+bd create --title="..."           # the CLI, nothing to run in the background
+bdui start                        # a board at 127.0.0.1:3000, if you would rather have a UI
 ```
 
-Create a seed ticket on it, holding whatever context you have. A rough one is fine; the grill
-sharpens it.
+**Do not start the board on the user's behalf.** `bdui start` is a daemon, not a command: it outlives
+the session, nothing in this skill ever stops it, and `127.0.0.1:3000` is the most contested port in
+web development — it is very likely already serving the app they are working on. Offer it, and let
+them say yes. The loop itself never needs the board; `bd` does everything from the CLI.
+
+If they do want it, run it once per workspace: a second `bdui start` elsewhere registers that
+workspace with the server already running rather than starting another, which is what populates the
+switcher in the UI.
+
+With the seed ticket written, sharpen it from the workspace root:
 
 ```bash
 cd <workspace> && claude
@@ -190,7 +206,7 @@ cannot see a workspace-level database. A shell hook resolves it by walking up to
 never shows the other's work. Never point one workspace's tooling at another's glossary or queue:
 a different workspace describes a different business.
 
-**GUI.** `bdui start` from the workspace root serves the read-write board at `127.0.0.1:3000`, which is where step 2 begins.
+**GUI.** `bdui start` from the workspace root serves an optional read-write board at `127.0.0.1:3000`. Start it yourself; it is a daemon and nothing here stops it.
 `bv` is a read-only TUI with a dependency graph.
 
 **A board showing the wrong workspace's tickets.** `BEADS_DIR` is resolved once, when the server

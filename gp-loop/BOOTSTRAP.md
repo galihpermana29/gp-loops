@@ -29,7 +29,7 @@ approving, and undo one part without unpicking the rest.
 ```bash
 brew install beads          # bd, the queue — github.com/gastownhall/beads
 brew install beads_viewer   # bv, read-only TUI (optional)
-npm i -g beads-ui           # bdui, the board you write and triage tickets on
+npm i -g beads-ui           # bdui, an optional board for writing and triaging tickets
 ```
 
 `bootstrap.sh` checks for these and prints the install line for anything missing. It will not

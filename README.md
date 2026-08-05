@@ -52,7 +52,7 @@ By using this you accept the risk. See [LICENSE](LICENSE) — it is provided as 
 | zsh or bash | fish works, with one manual step |
 | [`code-review`](https://github.com/mattpocock/skills) | **required** — the loop refuses to start without it |
 | `grill-with-docs`, `to-spec`, `to-tickets`, `triage`, `tdd` | the authoring pipeline, same source |
-| [`bdui`](https://www.npmjs.com/package/beads-ui) | the board you write and triage tickets on |
+| [`bdui`](https://www.npmjs.com/package/beads-ui) | optional board for writing and triaging tickets |
 
 The bootstrap checks for all of these and offers to install the skills, so you do not have to chase
 them individually.
@@ -150,13 +150,18 @@ later — splitting a shared queue afterwards is the harder direction.
 
 Either way the `repo:<name>` label on every ticket is what tells the loop which codebase to work in.
 
-The daily shape:
+The daily shape. Write a rough seed ticket however you prefer:
 
 ```bash
-bdui start                                 # the board, at 127.0.0.1:3000
+bd create --title="..."                    # the CLI
+bdui start                                 # or a board at 127.0.0.1:3000, if you want a UI
 ```
 
-Write a rough seed ticket on the board, then sharpen it into real ones in a single Claude session:
+`bdui` is a convenience, not a requirement — and it is a daemon on the most contested port in web
+development, so start it yourself rather than having it started for you. Run it once per workspace to
+populate the switcher; a second `bdui start` registers with the server already running.
+
+Then sharpen the seed into real tickets in a single Claude session:
 
 ```
 /grill-with-docs      then: grill <ticket-id>
