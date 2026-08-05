@@ -65,8 +65,13 @@ verifies less, and it will say so in the ticket notes rather than quietly implyi
 ## Install
 
 ```bash
-npx skills add galihpermana29/gp-loops --skill=gp-loop
+npx skills add galihpermana29/gp-loops --skill=gp-loop -g
 ```
+
+**Keep the `-g`.** Without it the skill installs into whichever project you are standing in, which
+loads it there only and leaves `.agents/` and `skills-lock.json` untracked in that repo — and the
+loop refuses to run against a dirty tree. Restart Claude Code afterwards if `/gp-loop` does not
+appear straight away.
 
 Then, in Claude Code:
 
@@ -74,8 +79,10 @@ Then, in Claude Code:
 /gp-loop
 ```
 
-With no workspace set up it routes you to the bootstrap, which checks what is missing, tells you how
-to install it, and wires up the rest. It is idempotent — run it as often as you like.
+With no workspace set up it sets one up: it works out what is missing, asks you for a ticket prefix,
+creates the queue, wires the repo, and offers to write an `AGENTS.md` by reading your code. Every
+command surfaces as a permission prompt, so nothing happens without you seeing it. It is idempotent —
+run it as often as you like.
 
 ## How it fits together
 

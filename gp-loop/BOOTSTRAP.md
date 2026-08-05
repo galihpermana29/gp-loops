@@ -130,8 +130,8 @@ git-excluded like the starter, so nothing reaches your collaborators until you c
 The loop itself needs two:
 
 ```bash
-npx skills add mattpocock/skills --skill=code-review   # required — the loop refuses to start without it
-npx skills add mattpocock/skills --skill=tdd           # optional — shapes how work is approached
+npx skills add mattpocock/skills --skill=code-review -g   # required — the loop refuses to start without it
+npx skills add mattpocock/skills --skill=tdd -g           # optional — shapes how work is approached
 ```
 
 `code-review` is not negotiable. The prompt tells every iteration to review its own work before
@@ -141,15 +141,25 @@ unreviewed code while reporting success.
 The authoring pipeline needs four more. You can skip these and write tickets by hand:
 
 ```bash
-npx skills add mattpocock/skills --skill=grill-with-docs
-npx skills add mattpocock/skills --skill=to-spec
-npx skills add mattpocock/skills --skill=to-tickets
-npx skills add mattpocock/skills --skill=triage
+npx skills add mattpocock/skills --skill=grill-with-docs -g
+npx skills add mattpocock/skills --skill=to-spec -g
+npx skills add mattpocock/skills --skill=to-tickets -g
+npx skills add mattpocock/skills --skill=triage -g
 ```
 
-They install user-scoped, so they load in every repo on the machine with no per-repo step.
+**`-g` is doing real work in every one of those lines.** Without it `skills add` installs into the
+*current project*, dropping `.agents/` and `skills-lock.json` into whatever repo you happened to be
+standing in. Two consequences, both bad: the skill loads in that project only, and the repo is left
+permanently untracked-dirty, which the loop refuses to run against. With `-g` they land in
+`~/.agents/skills/`, symlinked into `~/.claude/skills/`, and load in every repo on the machine with
+no per-repo step.
 
-Verify: `/gp-loop` appears in the skill list.
+The installer targets around 75 different agents and symlinks into each one it finds. Expect it to
+report a failure or two for agents that do not support global installation — harmless, as long as the
+line for your own agent says installed.
+
+Verify: `ls ~/.claude/skills/gp-loop` lists `SKILL.md`, and `/gp-loop` appears in the skill list.
+Claude Code may need restarting before it notices a newly installed skill.
 
 ## 6. Workspace orientation
 

@@ -405,11 +405,15 @@ if ((${#missing[@]})); then
       [[ "$reply" == [yY]* ]] && install=true
     fi
     if $install; then
+      # -g installs user-level. Without it `skills add` defaults to the current
+      # project, dropping .agents/ and skills-lock.json into the repo - which
+      # leaves it permanently untracked, and the loop refuses a dirty tree. The
+      # skills are machine-wide tooling anyway, not a dependency of one project.
       for s in "${missing[@]}"; do
-        npx --yes skills add mattpocock/skills --skill="$s" && did "installed $s" || fail "could not install $s"
+        npx --yes skills add mattpocock/skills --skill="$s" -g && did "installed $s" || fail "could not install $s"
       done
     else
-      todo "install them with:  npx skills add mattpocock/skills --skill=<name>"
+      todo "install them with:  npx skills add mattpocock/skills --skill=<name> -g"
     fi
   fi
 fi
