@@ -159,6 +159,9 @@ report a failure or two for agents that do not support global installation — h
 line for your own agent says installed.
 
 Verify: `ls ~/.claude/skills/gp-loop` lists `SKILL.md`, and `/gp-loop` appears in the skill list.
+If that directory is empty while `~/.agents/skills/gp-loop` exists, the files installed but the agent
+was never linked to them — re-run naming it, `-a claude-code`. The installer prints `Done!` either
+way, so this is worth actually checking rather than assuming.
 Claude Code may need restarting before it notices a newly installed skill.
 
 ## 6. Workspace orientation
