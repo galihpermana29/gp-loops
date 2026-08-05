@@ -11,6 +11,7 @@
 # Usage:
 #   ./bootstrap.sh [workspace-root]          # defaults to the current directory
 #   ./bootstrap.sh --check [workspace-root]  # report only, change nothing
+#   ./bootstrap.sh --sync [workspace-root]   # refresh tooling from the skill, keep config
 #   ./bootstrap.sh --yes [workspace-root]    # do not prompt before installing skills
 #
 set -euo pipefail
@@ -20,9 +21,11 @@ TEMPLATE="$SKILL_DIR/template"
 
 CHECK_ONLY=false
 ASSUME_YES=false
+SYNC=false
 while [[ "${1:-}" == --* ]]; do
   case "$1" in
     --check) CHECK_ONLY=true ;;
+    --sync) SYNC=true ;;
     --yes|-y) ASSUME_YES=true ;;
     *) printf 'unknown flag: %s\n' "$1" >&2; exit 2 ;;
   esac
@@ -106,18 +109,68 @@ fi
 # --- 3. the tooling ---------------------------------------------------------
 # The template ships with the skill, so a workspace is created from it rather
 # than copied out of somebody else's machine.
+#
+# The four files are not the same kind of thing, and that is the whole reason a
+# plain re-copy is wrong. MACHINERY is the tool: replacing it is how a workspace
+# receives a fix, and nobody is expected to have edited it. CONFIG carries the
+# workspace's own paths, repo names and glossary - overwriting that destroys the
+# customisation the design asks for. So drift is reported for both and only
+# MACHINERY is ever written.
+MACHINERY=(ralph.sh ralph-prompt.md)
+CONFIG=(issue-tracker-beads.md domain-workspace.md)
+
+# Lines differing between the shipped template and the workspace's copy.
+drift_lines() {
+  local f="$1"
+  [[ -f "$WS/$f" ]] || { printf 'missing'; return; }
+  diff "$TEMPLATE/$f" "$WS/$f" 2>/dev/null | grep -c '^[<>]' || true
+}
+
 echo
 echo "tooling"
-if [[ -f "$WS/ralph.sh" ]]; then
-  pass ".workspace already present"
-elif $CHECK_ONLY; then
-  todo ".workspace missing; would be created from the skill's template"
+if [[ ! -f "$WS/ralph.sh" ]]; then
+  if $CHECK_ONLY; then
+    todo ".workspace missing; would be created from the skill's template"
+  else
+    mkdir -p "$WS"
+    cp "$TEMPLATE"/ralph.sh "$TEMPLATE"/ralph-prompt.md \
+       "$TEMPLATE"/issue-tracker-beads.md "$TEMPLATE"/domain-workspace.md "$WS/"
+    chmod +x "$WS/ralph.sh"
+    did "created .workspace from the skill's template"
+  fi
 else
-  mkdir -p "$WS"
-  cp "$TEMPLATE"/ralph.sh "$TEMPLATE"/ralph-prompt.md \
-     "$TEMPLATE"/issue-tracker-beads.md "$TEMPLATE"/domain-workspace.md "$WS/"
-  chmod +x "$WS/ralph.sh"
-  did "created .workspace from the skill's template"
+  # A workspace created before a skill update keeps the tooling it was born
+  # with - `bd`'s guards included - unless something says so. This is that.
+  stale=()
+  for f in "${MACHINERY[@]}"; do
+    [[ "$(drift_lines "$f")" != "0" ]] && stale+=("$f")
+  done
+
+  if ((${#stale[@]} == 0)); then
+    pass ".workspace present, tooling matches the skill"
+  elif $SYNC && ! $CHECK_ONLY; then
+    backup="$WS.backup-$(date +%Y%m%d-%H%M%S)"
+    cp -r "$WS" "$backup"
+    did "backed up .workspace to $(basename "$backup")"
+    for f in "${stale[@]}"; do
+      cp "$TEMPLATE/$f" "$WS/$f"
+      did "refreshed $f from the skill"
+    done
+    chmod +x "$WS/ralph.sh"
+  else
+    for f in "${stale[@]}"; do
+      todo "$f is $(drift_lines "$f") lines out of step with the skill"
+    done
+    todo "run with --sync to refresh the tooling (your config docs are left alone)"
+  fi
+
+  # Never rewritten, only reported: a structural change upstream is worth
+  # folding in by hand, and the differences are usually the point of the file.
+  for f in "${CONFIG[@]}"; do
+    d=$(drift_lines "$f")
+    [[ "$d" == "0" || "$d" == "missing" ]] && continue
+    pass "$f differs from the template by $d lines - yours, left alone"
+  done
 fi
 
 # --- 4. shell resolution ----------------------------------------------------
