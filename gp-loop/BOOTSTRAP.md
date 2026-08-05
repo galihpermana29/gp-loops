@@ -29,7 +29,7 @@ approving, and undo one part without unpicking the rest.
 ```bash
 brew install beads          # bd, the queue — github.com/gastownhall/beads
 brew install beads_viewer   # bv, read-only TUI (optional)
-npm i -g beads-ui           # bdui, the board you write and triage tickets on
+npm i -g beads-ui           # bdui, an optional board for writing and triaging tickets
 ```
 
 `bootstrap.sh` checks for these and prints the install line for anything missing. It will not
@@ -207,6 +207,59 @@ a glance which queue a ticket came from.
 Each workspace gets its own copy of the tooling from the template rather than a copy of another
 workspace's. That matters: config documents copied between workspaces carry absolute paths, and a
 workspace pointed at another workspace's glossary will quietly use the wrong vocabulary.
+
+## Keeping it up to date
+
+Two things go stale, in two different ways, and updating one does not update the other.
+
+### The skill
+
+The install is a snapshot. Nothing links it to the repository, so merges upstream reach you only when
+you ask:
+
+```bash
+npx skills update gp-loop -g          # alias: upgrade
+```
+
+### The workspace
+
+This is the one that surprises people. `bootstrap.sh` **copies** the template into `.workspace/` and
+then skips any workspace that already has one — which is what makes re-running it safe, and also what
+makes the copy permanent. A workspace set up months ago is still running the `ralph.sh` it was born
+with, no matter how many times you update the skill.
+
+The four files are not the same kind of thing, so they do not get the same treatment:
+
+| file | what it is | on update |
+|---|---|---|
+| `ralph.sh` | the loop itself | **replace** — this is the tool |
+| `ralph-prompt.md` | what each iteration is told | **replace** — this is the tool |
+| `issue-tracker-beads.md` | your queue's conventions | **keep** — you customised this |
+| `domain-workspace.md` | your glossary and repo map | **keep** — you customised this |
+
+So a sync is: take the machinery, leave the configuration.
+
+```bash
+T=~/.claude/skills/gp-loop/template
+W=<workspace>/.workspace
+
+cp -r "$W" "$W.backup"                       # the config docs are not recoverable elsewhere
+cp "$T/ralph.sh" "$W/ralph.sh" && chmod +x "$W/ralph.sh"
+cp "$T/ralph-prompt.md" "$W/ralph-prompt.md"
+
+cd <workspace> && ./.workspace/ralph.sh --dry-run 1
+```
+
+Diff the two config documents against the template occasionally as well — not to overwrite them, but
+because a structural change upstream is worth folding in by hand.
+
+**Your queue is never involved.** `.beads/` and `.workspace/` are separate directories: one holds
+tickets, the other holds tooling. Nothing in an update, a sync, or even removing the skill entirely
+reads or writes the queue.
+
+Worth doing after any upstream change that touches `ralph.sh`, because that is where the guards live.
+`require_skills()` — the hard stop when `code-review` is missing — reached the template long after
+the first workspaces were created, and none of them had it until they were synced.
 
 ## Keeping it recoverable
 

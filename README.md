@@ -52,7 +52,7 @@ By using this you accept the risk. See [LICENSE](LICENSE) — it is provided as 
 | zsh or bash | fish works, with one manual step |
 | [`code-review`](https://github.com/mattpocock/skills) | **required** — the loop refuses to start without it |
 | `grill-with-docs`, `to-spec`, `to-tickets`, `triage`, `tdd` | the authoring pipeline, same source |
-| [`bdui`](https://www.npmjs.com/package/beads-ui) | the board you write and triage tickets on |
+| [`bdui`](https://www.npmjs.com/package/beads-ui) | optional board for writing and triaging tickets |
 
 The bootstrap checks for all of these and offers to install the skills, so you do not have to chase
 them individually.
@@ -88,6 +88,17 @@ npx skills add galihpermana29/gp-loops --skill=gp-loop -g -a claude-code
 `skills add` targets around 75 agents and picks them up by detection, which does not always include
 the one you are sitting in. Restart Claude Code afterwards — a newly installed skill is not always
 picked up by a running session. The skill is `gp-loop`, singular; `gp-loops` is the repository.
+
+**Updating.** The install is a snapshot, not a link, so nothing arrives on its own:
+
+```bash
+npx skills update gp-loop -g
+```
+
+That refreshes the skill. It does **not** touch a workspace you already set up — `.workspace/` holds
+its own copy of `ralph.sh` and the prompt, taken when it was created. Syncing that is a separate,
+deliberate step, and BOOTSTRAP.md's *Keeping it up to date* explains which files to replace and which
+are yours to keep. Your queue is never involved either way.
 
 Then, in Claude Code:
 
@@ -150,13 +161,18 @@ later — splitting a shared queue afterwards is the harder direction.
 
 Either way the `repo:<name>` label on every ticket is what tells the loop which codebase to work in.
 
-The daily shape:
+The daily shape. Write a rough seed ticket however you prefer:
 
 ```bash
-bdui start                                 # the board, at 127.0.0.1:3000
+bd create --title="..."                    # the CLI
+bdui start                                 # or a board at 127.0.0.1:3000, if you want a UI
 ```
 
-Write a rough seed ticket on the board, then sharpen it into real ones in a single Claude session:
+`bdui` is a convenience, not a requirement — and it is a daemon on the most contested port in web
+development, so start it yourself rather than having it started for you. Run it once per workspace to
+populate the switcher; a second `bdui start` registers with the server already running.
+
+Then sharpen the seed into real tickets in a single Claude session:
 
 ```
 /grill-with-docs      then: grill <ticket-id>
