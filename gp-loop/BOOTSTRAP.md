@@ -223,12 +223,19 @@ npx skills update gp-loop -g          # alias: upgrade
 
 ### The workspace
 
-This is the one that surprises people. `bootstrap.sh` **copies** the template into `.workspace/` and
-then skips any workspace that already has one — which is what makes re-running it safe, and also what
-makes the copy permanent. A workspace set up months ago is still running the `ralph.sh` it was born
-with, no matter how many times you update the skill.
+`bootstrap.sh` **copies** the template into `.workspace/` when it creates a workspace, so a workspace
+set up months ago is still running the `ralph.sh` it was born with however many times you update the
+skill. Every run reports the gap, and `--sync` closes it:
 
-The four files are not the same kind of thing, so they do not get the same treatment:
+```bash
+<skill-dir>/bootstrap.sh --check <workspace-root>   # names any file out of step
+<skill-dir>/bootstrap.sh --sync  <workspace-root>   # refreshes the tooling
+```
+
+`--sync` copies `.workspace/` to a timestamped backup first, then replaces only the machinery. Your
+config documents are reported and never written.
+
+The four files are not the same kind of thing, which is why a plain re-copy would be wrong:
 
 | file | what it is | on update |
 |---|---|---|
@@ -237,21 +244,15 @@ The four files are not the same kind of thing, so they do not get the same treat
 | `issue-tracker-beads.md` | your queue's conventions | **keep** — you customised this |
 | `domain-workspace.md` | your glossary and repo map | **keep** — you customised this |
 
-So a sync is: take the machinery, leave the configuration.
+A sync takes the machinery and leaves the configuration. `--sync` reports the config drift rather
+than acting on it, because those differences are usually the point of the file — but a structural
+change upstream is still worth folding in by hand occasionally, so it is shown rather than hidden.
+
+Run the loop once afterwards to confirm the new tooling starts:
 
 ```bash
-T=~/.claude/skills/gp-loop/template
-W=<workspace>/.workspace
-
-cp -r "$W" "$W.backup"                       # the config docs are not recoverable elsewhere
-cp "$T/ralph.sh" "$W/ralph.sh" && chmod +x "$W/ralph.sh"
-cp "$T/ralph-prompt.md" "$W/ralph-prompt.md"
-
 cd <workspace> && ./.workspace/ralph.sh --dry-run 1
 ```
-
-Diff the two config documents against the template occasionally as well — not to overwrite them, but
-because a structural change upstream is worth folding in by hand.
 
 **Your queue is never involved.** `.beads/` and `.workspace/` are separate directories: one holds
 tickets, the other holds tooling. Nothing in an update, a sync, or even removing the skill entirely
