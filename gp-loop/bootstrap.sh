@@ -51,12 +51,56 @@ command -v bv   >/dev/null && pass "bv (optional, read-only TUI)"   || todo "bv 
 command -v bdui >/dev/null && pass "bdui (the board you write tickets on)"  || todo "bdui missing:  npm i -g beads-ui"
 
 # --- 2. the queue -----------------------------------------------------------
+# Created here rather than left as an instruction to paste. The prefix is the
+# one real decision - it is what tells you at a glance which workspace a ticket
+# belongs to - so it is asked for rather than assumed, and everything else about
+# the command is knowable from where we are standing.
+#
+# `bd init` itself is not a package manager, so this does not contradict the
+# rule about installing binaries unannounced: it creates a database inside a
+# directory the user just pointed us at.
+
+# A short, memorable default: initials for a hyphenated name, otherwise the
+# first few letters. Only ever a suggestion.
+suggest_prefix() {
+  local base="$1" out
+  if [[ "$base" == *-* ]]; then
+    out=$(awk -F- '{for(i=1;i<=NF;i++) printf "%s", substr($i,1,1)}' <<<"$base")
+  else
+    out=${base:0:3}
+  fi
+  out=$(tr -cd '[:alnum:]' <<<"$out" | tr '[:upper:]' '[:lower:]')
+  printf '%s' "${out:-ws}"
+}
+
 echo
 echo "queue"
 if [[ -f "$ROOT/.beads/config.yaml" ]]; then
   pass ".beads at the workspace root"
+elif $CHECK_ONLY; then
+  todo "no queue yet; would create one (you will be asked for a prefix)"
+elif ! command -v bd >/dev/null; then
+  todo "no queue, and bd is not installed yet - install it, then re-run this"
 else
-  todo "no queue yet:  (cd $ROOT && bd init -p <prefix> --non-interactive --stealth --skip-agents)"
+  DEFAULT_PREFIX=$(suggest_prefix "$(basename "$ROOT")")
+  PREFIX="$DEFAULT_PREFIX"
+  if ! $ASSUME_YES; then
+    printf '  Ticket prefix for this workspace, so its IDs read %s-1, %s-2 [%s]: ' \
+      "$DEFAULT_PREFIX" "$DEFAULT_PREFIX" "$DEFAULT_PREFIX"
+    read -r reply </dev/tty || reply=""
+    [[ -n "$reply" ]] && PREFIX=$(tr -cd '[:alnum:]' <<<"$reply" | tr '[:upper:]' '[:lower:]')
+  fi
+  # BEADS_DIR is unset for this call only. The shell hook exports it from
+  # whichever workspace you last stood in, and bd would otherwise report that
+  # this one is "already initialized" while naming a path you did not expect.
+  if (cd "$ROOT" && env -u BEADS_DIR bd init -p "$PREFIX" \
+        --non-interactive --stealth --skip-agents >/dev/null 2>&1); then
+    did "created the queue, prefix $PREFIX (tickets will be ${PREFIX}-1, ${PREFIX}-2, ...)"
+  else
+    fail "bd init failed; run it yourself to see why:"
+    printf '        (cd %s && env -u BEADS_DIR bd init -p %s --non-interactive --stealth --skip-agents)\n' \
+      "$ROOT" "$PREFIX"
+  fi
 fi
 
 # --- 3. the tooling ---------------------------------------------------------
@@ -176,7 +220,13 @@ if [[ -d "$ROOT/.git" ]] && $CHECK_ONLY; then
   if [[ -r "$ROOT/docs/agents/issue-tracker.md" ]]; then wired=$((wired+1)); else skipped=$((skipped+1)); fi
 elif [[ -d "$ROOT/.git" ]]; then
   wire_repo "$ROOT" "../.."
-  grep -qxF '.workspace/' "$ROOT/.git/info/exclude" 2>/dev/null || echo '.workspace/' >>"$ROOT/.git/info/exclude"
+  # CONTEXT.md belongs here as much as .workspace/ does. In a multi-repo
+  # workspace it sits above every repo and no git tree sees it; in a single-repo
+  # one it lands *inside* the repo, and an untracked starter is enough to trip
+  # ralph.sh's clean-tree guard - so the loop would never run at all.
+  for pat in '.workspace/' 'CONTEXT.md'; do
+    grep -qxF "$pat" "$ROOT/.git/info/exclude" 2>/dev/null || echo "$pat" >>"$ROOT/.git/info/exclude"
+  done
   did "excluded the tooling from the workspace root's own repo"
   wired=$((wired+1))
 elif ! $CHECK_ONLY; then

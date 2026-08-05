@@ -12,10 +12,27 @@ clean context window and disk is the only memory.
 > cannot answer permission prompts. Every iteration can read, write and execute anything your user
 > account can. The guards protect the repository, not the machine. See the README before first use.
 
-Two branches through this skill:
+## First, find out where you are
 
-- **Setting up a machine or a new workspace** → [BOOTSTRAP.md](BOOTSTRAP.md).
-- **Doing the work** → the runbook below.
+Do not ask the user which branch they want, and do not paste setup commands for them to run. Work it
+out and offer to act. Start here, every time:
+
+```bash
+<skill-dir>/bootstrap.sh --check <the directory the user is working in>
+```
+
+`--check` changes nothing and reports the whole state in one pass: binaries, queue, tooling, shell
+hook, repo wiring, `AGENTS.md`, skills.
+
+Read it, then take one of two branches:
+
+- **Anything reports `todo`** → this is setup. Follow [BOOTSTRAP.md](BOOTSTRAP.md), which is written
+  for you rather than for the user. Tell them what you are about to run and why, then run it. They
+  still approve each command through the normal permission prompt, so nothing happens silently.
+- **Everything reports `ok`** → the workspace is ready. Go to the runbook below.
+
+If the directory is not obviously the workspace root, ask which directory it is. That, and the ticket
+prefix, are the only two things the user has to decide.
 
 ## The runbook
 

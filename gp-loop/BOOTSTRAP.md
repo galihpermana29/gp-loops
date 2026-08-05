@@ -2,14 +2,27 @@
 
 Setting up a workspace, on a fresh machine or alongside one you already have.
 
-Run [`bootstrap.sh`](bootstrap.sh) for the mechanical parts. It is idempotent, verifies each step,
-and reports what it changed. The judgement calls below are what it deliberately leaves to you.
+**This page is addressed to the agent.** If you are reading it because the user asked for `/gp-loop`,
+you are the one who runs these steps. Do not print them for the user to copy: say what you are about
+to do, then do it. Every command still surfaces as a permission prompt they approve, so showing your
+work and doing the work are not in tension.
+
+There are exactly two things only the user can decide: **which directory is the workspace**, and
+**the ticket prefix**. Ask those. Everything else you can determine.
+
+The whole flow is one command, run twice:
 
 ```bash
-~/.claude/skills/gp-loop/bootstrap.sh <workspace-root>
-~/.claude/skills/gp-loop/bootstrap.sh --check <workspace-root>   # report only
-~/.claude/skills/gp-loop/bootstrap.sh --yes <workspace-root>     # don't prompt before installing skills
+<skill-dir>/bootstrap.sh --check <workspace-root>   # find out what is missing, change nothing
+<skill-dir>/bootstrap.sh <workspace-root>           # do it, prompting where a decision is needed
 ```
+
+It is idempotent, verifies each step, and reports what it changed. Re-run it freely. `--yes` skips
+the prompts and takes the defaults, which is useful in a scripted setup and wrong for a first run,
+because the prefix deserves a moment's thought.
+
+The sections below explain what each step does and why, so you can tell the user what they are
+approving, and undo one part without unpicking the rest.
 
 ## 1. Binaries
 
@@ -47,32 +60,29 @@ For a single-repo workspace, `.beads` and `.workspace` live *inside* that repo. 
 sitting in a repo somebody else pulls, which is why `bootstrap.sh` excludes it — without that, the
 loop's clean-tree guard sees permanently untracked tooling and never runs.
 
-## 3. Create the queue
+## 3. The queue
+
+`bootstrap.sh` creates this. It asks for a prefix, suggesting one from the directory name, and runs:
 
 ```bash
-cd <workspace-root>
-bd init -p <prefix> --non-interactive --stealth --skip-agents
+(cd <workspace-root> && env -u BEADS_DIR bd init -p <prefix> --non-interactive --stealth --skip-agents)
 ```
 
 `--stealth` writes `.git/info/exclude` entries so beads files stay invisible to collaborators.
-`--skip-agents` leaves any existing `CLAUDE.md` or `AGENTS.md` alone.
+`--skip-agents` leaves any existing `CLAUDE.md` or `AGENTS.md` alone. `env -u BEADS_DIR` matters
+because the shell hook exports it from whichever workspace you last stood in, and `bd` would
+otherwise report that this one is "already initialized" while naming a path you did not expect.
 
-Pick a short prefix, and a different one per workspace. It is what tells you at a glance that a
-ticket is in the queue you meant.
-
-> If `bd init` reports "this workspace is already initialized" and names a path you did not expect,
-> `BEADS_DIR` is set in your shell from another workspace. `env -u BEADS_DIR bd init ...` or open a
-> fresh shell.
+The prefix is worth a moment. It is what tells you at a glance that a ticket belongs to the queue you
+meant, so use a different one per workspace. The suggestion is initials for a hyphenated directory
+name and the first few letters otherwise — fine to accept, better to choose.
 
 Verify: `bd where` from the workspace root prints `<workspace-root>/.beads`.
 
-## 4. Run the bootstrap
+## 4. What the bootstrap does
 
-```bash
-~/.claude/skills/gp-loop/bootstrap.sh <workspace-root>
-```
-
-What it does, so you can undo one part without unpicking the rest:
+Beyond the queue above, in the order it reports them — so you can tell the user what they are
+approving, and undo one part without unpicking the rest:
 
 - **Tooling.** Creates `.workspace/` from the template shipped with this skill: `ralph.sh`, the
   prompt, and the two config documents. Skipped if one already exists.
@@ -171,14 +181,15 @@ Done when every step passed on a ticket you were willing to throw away.
 ## Adding a second workspace
 
 The binaries and the skills are machine-wide, so a second workspace needs only its own queue and its
-own tooling:
+own tooling — which is the same one command, and it will ask for a prefix again:
 
 ```bash
-cd <new-workspace-root>
-bd init -p <different-prefix> --non-interactive --stealth --skip-agents
-~/.claude/skills/gp-loop/bootstrap.sh .
-./.workspace/ralph.sh --dry-run 1     # expect: queue drained
+<skill-dir>/bootstrap.sh <new-workspace-root>
+cd <new-workspace-root> && ./.workspace/ralph.sh --dry-run 1   # expect: queue drained
 ```
+
+Give it a **different** prefix from the first. That is the whole point of the prefix: to tell you at
+a glance which queue a ticket came from.
 
 Each workspace gets its own copy of the tooling from the template rather than a copy of another
 workspace's. That matters: config documents copied between workspaces carry absolute paths, and a
