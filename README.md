@@ -89,6 +89,17 @@ npx skills add galihpermana29/gp-loops --skill=gp-loop -g -a claude-code
 the one you are sitting in. Restart Claude Code afterwards — a newly installed skill is not always
 picked up by a running session. The skill is `gp-loop`, singular; `gp-loops` is the repository.
 
+**Updating.** The install is a snapshot, not a link, so nothing arrives on its own:
+
+```bash
+npx skills update gp-loop -g
+```
+
+That refreshes the skill. It does **not** touch a workspace you already set up — `.workspace/` holds
+its own copy of `ralph.sh` and the prompt, taken when it was created. Syncing that is a separate,
+deliberate step, and BOOTSTRAP.md's *Keeping it up to date* explains which files to replace and which
+are yours to keep. Your queue is never involved either way.
+
 Then, in Claude Code:
 
 ```
