@@ -35,7 +35,14 @@ Done when: the target repo is on a task branch with a clean tree.
 
 ### 2. Grill, spec, tickets — one session
 
-Create a seed ticket first, holding whatever context you have. A rough one is fine; the grill
+Start the board. It is where tickets get written, where the dependency graph is legible, and where
+you open the gate later, so it is the first thing up rather than an optional extra:
+
+```bash
+bdui start                        # read-write board at 127.0.0.1:3000
+```
+
+Create a seed ticket on it, holding whatever context you have. A rough one is fine; the grill
 sharpens it.
 
 ```bash
@@ -57,6 +64,36 @@ The grill writes terms into the workspace `CONTEXT.md` and decisions into `docs/
 `/to-tickets` creates child tickets with blocking edges.
 
 Done when: `bd children <epic>` shows the tickets, and `bd blocked` shows the edges you expect.
+
+#### Write fewer, fatter tickets than feels natural
+
+This is the one thing to override `/to-tickets` on. Its instinct is to split wherever work is
+mechanically separable, and that instinct is wrong here, because every ticket is worked by a fresh
+process with an empty context window.
+
+Each one therefore pays a full cold start before it writes a line: re-reading the glossary and the
+ADRs, searching the codebase, running the suite, reviewing the diff, and the bookkeeping. Measured
+across one feature's worth of tickets, that fixed cost came to roughly **10 minutes per ticket**,
+against about **1.4 minutes per 100 changed lines** of actual work. Two-thirds of a typical
+iteration is the cost of starting, not the cost of the work.
+
+The evidence, from tickets in the same run: one changed 206 lines in 9 minutes; another changed 998
+lines, nearly five times as much, in 20 minutes. Three of them re-run as a single fat ticket took
+**10 minutes against the original 40**, with no defect traceable to the merge.
+
+So:
+
+- **Size a ticket near 800-1000 changed lines.** That lands cleanly in one context window, including
+  a shared component. Two hundred is far too small.
+- **Merge anything that was split only because it could be**, rather than because a blocker sits
+  between the halves. Real blocking edges still deserve separate tickets.
+- **The ceiling is the context window, not a line count.** If a ticket genuinely will not fit,
+  splitting is still right, and the prompt tells the loop to split rather than half-build.
+
+Do not claw the time back by dropping the per-ticket `/code-review`. The same experiment tried it,
+and two functional defects reached the branch: a modal stranded on a confirmation it could not
+dismiss, and a date function that threw on one input and silently returned a wrong result on
+another. Fat tickets are free; skipping review is paid for later.
 
 ### 3. Open the gate
 
@@ -136,7 +173,7 @@ cannot see a workspace-level database. A shell hook resolves it by walking up to
 never shows the other's work. Never point one workspace's tooling at another's glossary or queue:
 a different workspace describes a different business.
 
-**GUI.** `bdui start` from the workspace root serves a read-write board at `127.0.0.1:3000`.
+**GUI.** `bdui start` from the workspace root serves the read-write board at `127.0.0.1:3000`, which is where step 2 begins.
 `bv` is a read-only TUI with a dependency graph.
 
 **Recovering a run.** A ticket left `in_progress` after a crash returns to the queue with

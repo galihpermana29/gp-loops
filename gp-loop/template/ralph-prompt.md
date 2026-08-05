@@ -71,7 +71,12 @@ Keep the loop tight:
 ## 4. Verify
 
 Run this repo's verify command, the one named in the bead's acceptance criteria.
-If the bead names no verify command, use the repo's typecheck plus its full test suite.
+If the bead names no verify command, use the one named in `AGENTS.md`.
+If neither names one, use the repo's typecheck plus its full test suite.
+
+Some repos have no test suite at all. Do not treat that as verification passing.
+Run the strongest check that does exist - a typecheck, a lint, a build - and carry on, but say so
+plainly rather than letting a weaker check stand in silently for a stronger one.
 
 Then run `/code-review` on your work and address what it finds.
 
@@ -81,7 +86,10 @@ Only if verification passed with a zero exit:
 
 1. Commit to the current branch. Write the message in this repo's own convention.
 2. Capture the sha: `git rev-parse HEAD`.
-3. `bd update <id> --append-notes "implemented in <sha>"`
+3. `bd update <id> --append-notes "implemented in <sha>; verified with <the exact command you ran>"`
+   Name the command, not the outcome. `COMPLETE` means different things in a repo with a full suite
+   and a repo with only a typecheck, and the person reading this later cannot tell which they got
+   unless you write it down. If there was no test suite, say that here too.
 4. `bd close <id> --reason="<one line on what landed>"`
 5. Output `<promise>COMPLETE</promise>` as the last line of your response.
 
