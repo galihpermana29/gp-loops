@@ -70,8 +70,24 @@ npx skills add galihpermana29/gp-loops --skill=gp-loop -g
 
 **Keep the `-g`.** Without it the skill installs into whichever project you are standing in, which
 loads it there only and leaves `.agents/` and `skills-lock.json` untracked in that repo — and the
-loop refuses to run against a dirty tree. Restart Claude Code afterwards if `/gp-loop` does not
-appear straight away.
+loop refuses to run against a dirty tree.
+
+Then check it actually arrived, because the installer reports `Done!` either way:
+
+```bash
+ls ~/.claude/skills/gp-loop        # expect SKILL.md, BOOTSTRAP.md, bootstrap.sh, template
+```
+
+If that is empty while `~/.agents/skills/gp-loop` exists, the files landed but your agent was never
+linked to them. Name it explicitly:
+
+```bash
+npx skills add galihpermana29/gp-loops --skill=gp-loop -g -a claude-code
+```
+
+`skills add` targets around 75 agents and picks them up by detection, which does not always include
+the one you are sitting in. Restart Claude Code afterwards — a newly installed skill is not always
+picked up by a running session. The skill is `gp-loop`, singular; `gp-loops` is the repository.
 
 Then, in Claude Code:
 
@@ -92,10 +108,47 @@ run it as often as you like.
 ├── .workspace/      the loop: script, prompt, config docs
 ├── CONTEXT.md       shared glossary (optional, generated as a starter)
 ├── docs/adr/        architecture decisions (optional)
-└── <repo>/ ...      one or more git repos
+└── <repo>/ ...      the code — either repos beside these, or this root itself
 ```
 
-A workspace is either a folder holding several repos as siblings, or a single repo. Both work.
+## Which shape am I?
+
+A workspace is wherever `.beads/` sits. That is the whole definition, and it means you choose how
+much one queue covers. Two shapes, both first-class:
+
+**One repo, self-contained.** `.beads/` goes inside the repo. The repo *is* the workspace.
+
+```
+my-app/
+├── .beads/          the queue
+├── .workspace/      the loop
+└── src/
+```
+
+Calling a lone repo a "workspace" does sound odd, and it is worth saying so rather than pretending
+otherwise: the word is about where the queue lives, not about having several projects. This is the
+common case. Start here.
+
+**Several repos whose work interlocks.** A folder above them holds `.beads/`, and they share one
+queue.
+
+```
+my-company/
+├── .beads/          ONE queue, shared by all of them
+├── web/
+├── api/
+└── admin/
+```
+
+**The deciding question is not how many repos you have — it is whether a ticket in one needs to block
+a ticket in another.** That is the only thing a shared queue buys you, and it is worth a lot when you
+need it: an API change and the frontend that consumes it land in the right order, tracked as one
+dependency rather than two lists and a memory.
+
+If nothing blocks across repos, keep the queues separate. Separate is simpler, and you can move up
+later — splitting a shared queue afterwards is the harder direction.
+
+Either way the `repo:<name>` label on every ticket is what tells the loop which codebase to work in.
 
 The daily shape:
 

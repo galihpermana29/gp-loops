@@ -193,5 +193,18 @@ a different workspace describes a different business.
 **GUI.** `bdui start` from the workspace root serves the read-write board at `127.0.0.1:3000`, which is where step 2 begins.
 `bv` is a read-only TUI with a dependency graph.
 
+**A board showing the wrong workspace's tickets.** `BEADS_DIR` is resolved once, when the server
+starts, and then pins it for the life of the process — it overrides discovery, and the in-UI
+workspace switcher cannot move it. Start bdui from a shell where the variable is unset:
+
+```bash
+pkill -f beads-ui
+cd <workspace> && env -u BEADS_DIR bdui start
+```
+
+The tell is the ticket prefixes: if you switched to a workspace whose prefix is `foo` and every card
+still reads `bar-123`, you are looking at `bar`'s database. Worth knowing that bdui is a singleton,
+so a second instance on another port is refused and the switcher is the only way to change workspace.
+
 **Recovering a run.** A ticket left `in_progress` after a crash returns to the queue with
 `bd update <id> --status open`.
