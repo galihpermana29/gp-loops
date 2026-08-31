@@ -25,20 +25,77 @@ context per ticket costs a cold start each time and buys a predictable starting 
 The consequence is that ticket quality *is* output quality. A vague ticket cannot be rescued by
 context the agent no longer has.
 
-## `code-review` is required, `tdd` is not
+## Review happens once per branch, not once per ticket
 
-The loop refuses to start if `code-review` is absent.
+The loop used to run `/code-review` in every iteration, and refused to start without the skill.
+It now runs it in none, and the human runs it once on the branch before landing.
 
-The prompt tells every iteration to review its own work before promising completion. If the skill is
-missing that instruction is a silent no-op: the loop ships unreviewed code and reports success. The
-failure is invisible, which is what makes it worth a hard stop rather than a warning.
+The arithmetic is the reason. `/code-review` spawns two sub-agents, each reading the standards
+documents and the diff; measured on one real review that came to roughly 173k tokens. The loop
+commits **per ticket**, so a sixteen-ticket epic paid that sixteen times — for a diff that lands
+once, because the loop puts every ticket of an epic on one branch. Sixteen reviews of fragments,
+where one review of the whole thing is what actually gates the merge.
 
-This is not a guess. On one real feature, dropping the per-ticket review let two functional defects
-reach the branch — a modal stranded on an undismissable confirmation, and a date module that threw
-on one input and silently returned a wrong period for another. Both were caught by review and by
-nothing else.
+This is not the same as dropping review, which was tried and failed: two functional defects reached
+the branch — a modal stranded on an undismissable confirmation, and a date module that threw on one
+input and silently returned a wrong period for another. Both are diff-visible, so a branch-level
+review catches both. That experiment removed review; it never moved it.
 
-`tdd` shapes how work is approached rather than gating it, so its absence is a warning.
+What it costs is **feedback latency**, and that is a real cost paid in the expensive currency. A
+defect introduced in ticket 2 now surfaces after ticket 16, with fourteen tickets built on top of
+it, and the rework is measured in iterations. Per-ticket review failed fast. This does not.
+
+Two things keep it honest. Every ticket note now ends `not reviewed`, so a closed ticket never looks
+reviewed when it is not — the note the prompt already wrote gained a clause rather than the loop
+gaining a second note nobody would read. And `SKILL.md` step 5 makes the branch review an explicit
+step rather than an assumption.
+
+`tdd` stays in the loop. It spawns no sub-agents, so it was never part of the cost, and its
+pre-agreed-seams rule is satisfied by `/to-spec`, which confirms seams with a human and records them.
+Its absence is still only a warning, because it shapes how work is approached rather than gating it.
+
+## The loop measures what it costs
+
+Every claim in this file was measured in minutes. None was measured in tokens, which is how a month
+of runs can end at a session limit with nothing to point at.
+
+Iterations now use `--output-format json` and append a row to `costs.tsv`: cost, tokens, cache,
+sub-agents spawned, turns, duration, and the models that actually ran. Two columns exist for
+specific suspicions. `subagents`, because the prompt told every iteration to delegate its codebase
+search and nothing ever counted how wide that went. `models`, because an unset `RALPH_MODEL`
+inherits the user's Claude Code default, so a loop can run entirely on Opus without ever saying so.
+
+`RALPH_MODEL` is deliberately **unset** by default. Pinning something cheaper would change the
+quality of every existing loop on sync, silently, on the strength of a guess. The file is the
+evidence; the pin is what you do after reading it.
+
+The cost is one real hazard: the completion promise moved from a grep over the raw output to a `jq`
+extraction of `.result`. Get that wrong and the loop stops recognising success and re-queues work
+that passed — a failure that looks fine in a dry run, because a dry run never invokes the agent.
+
+## The loop is told where things are, not left to find out
+
+Every iteration used to search the codebase from scratch to check its work did not already exist.
+That instruction is sound — building a second copy of something is the most common way an
+unattended iteration is wasted — but it has no stopping condition, so a rational agent fans out into
+several full-repo sweeps, and sixteen tickets re-derive one layout sixteen times.
+
+An epic can now write `.scratch/<slug>/orientation.md` beside its spec, naming where its modules
+live and what already exists. `ralph.sh` inlines it exactly as it already inlines the ticket and the
+spec, and the prompt tells iterations to confirm against it and search only for genuine gaps.
+
+The exhaustive pass still happens; it happens once per epic instead of once per ticket, in the
+session where a human is already reading the code.
+
+The spec cannot carry this, deliberately: `/to-spec`'s template says *"Do NOT include specific file
+paths or code snippets. They may end up being outdated very quickly."* That is correct for a
+document read months later and wrong for one consumed by sixteen iterations the same afternoon —
+hence a separate file, with the commit it was accurate at written on it.
+
+A stale orientation is worse than none, because it points confidently at a module that has moved.
+So the prompt instructs an iteration that finds a bad path to record staleness on its ticket and
+fall back to searching, and an epic with no orientation file gets the old unbounded search — now
+capped at two `Explore` agents.
 
 ## Network failures do not spend a strike
 

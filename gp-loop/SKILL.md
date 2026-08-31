@@ -96,7 +96,40 @@ The grill writes terms into the workspace `CONTEXT.md` and decisions into `docs/
 `/to-spec` writes `.scratch/<slug>/spec.md` in the target repo.
 `/to-tickets` creates child tickets with blocking edges.
 
-Done when: `bd children <epic>` shows the tickets, and `bd blocked` shows the edges you expect.
+#### Then write the orientation, in the same session
+
+Alongside the spec, write `.scratch/<slug>/orientation.md`. The loop inlines it into every
+iteration, and section 2 of the prompt tells iterations to trust it instead of searching.
+
+This is the one thing in the pipeline that exists purely to save tokens, and it works because of
+where it sits: by this point you and the agent have just read the codebase together, so the file
+costs almost nothing to write. The spec deliberately cannot carry it — `/to-spec`'s template says
+*"Do NOT include specific file paths or code snippets. They may end up being outdated very
+quickly."* That is right for a spec read months later and wrong for a file consumed by sixteen
+iterations this afternoon, which is why it is a separate file with a commit stamp.
+
+Keep it to a page. It answers "where does the code for this epic live, and what already exists":
+
+```markdown
+# Orientation: <epic>
+Accurate at: <short sha>
+
+## Where the relevant code is
+- <module>: <path> — <the one thing an implementer needs to know about it>
+
+## Already exists — do not rebuild
+- <thing>: <path>
+
+## Known gaps
+- <what is genuinely missing, so a ticket does not go looking>
+```
+
+A stale orientation is worse than none, because it points confidently at a module that moved. Hence
+the commit stamp, and hence the prompt's instruction to note staleness on the ticket and fall back
+to searching. Omit the file entirely and the loop searches from scratch, as it always did.
+
+Done when: `bd children <epic>` shows the tickets, `bd blocked` shows the edges you expect, and
+`orientation.md` sits beside the spec.
 
 #### Write fewer, fatter tickets than feels natural
 
@@ -123,10 +156,16 @@ So:
 - **The ceiling is the context window, not a line count.** If a ticket genuinely will not fit,
   splitting is still right, and the prompt tells the loop to split rather than half-build.
 
-Do not claw the time back by dropping the per-ticket `/code-review`. The same experiment tried it,
-and two functional defects reached the branch: a modal stranded on a confirmation it could not
-dismiss, and a date function that threw on one input and silently returned a wrong result on
-another. Fat tickets are free; skipping review is paid for later.
+Fat tickets are the cheapest saving available, because every fixed cost above is paid **per
+ticket**. Sixteen thin tickets pay sixteen cold starts and sixteen searches for one branch's worth
+of work.
+
+Review is no longer among those per-ticket costs — the loop does not run it, you do, once per branch
+at land time (step 5). That is not the same as dropping it. An earlier experiment did drop it
+entirely and two functional defects reached the branch: a modal stranded on a confirmation it could
+not dismiss, and a date function that threw on one input and silently returned a wrong result on
+another. Both were diff-visible, so a branch-level review catches them — just later, after more
+tickets have stacked on top. Skipping review altogether is still paid for later.
 
 ### 3. Open the gate
 
@@ -184,15 +223,33 @@ bd list --status=closed
 Read the iteration transcript in `.workspace/logs/` even on success.
 Then run the repo's own verify command yourself.
 
+**Then review the branch.** This is where review lives now — once, on the accumulated diff, not once
+per ticket:
+
+```
+/code-review      then: review since <default-branch>
+```
+
+Every ticket note ends `not reviewed`, because none of them were. This step is what clears that, and
+it is reviewing the diff that actually lands rather than sixteen fragments of it — which also means
+it can see interactions between tickets that a per-ticket review structurally cannot.
+
+Offer this rather than assume it: the loop has no opinion on when you land, and a review of a branch
+you were not ready to land is wasted.
+
+**Also read `.workspace/costs.tsv`.** It has a row per iteration. The `subagents` column shows how
+wide each search went, and `models` shows what actually ran — an unset `RALPH_MODEL` inherits your
+Claude Code default, so check it says what you expect before running a long batch.
+
 The loop never pushes.
 Review and landing stay yours.
 
 ## Reference
 
 **Guards.** The loop refuses a ticket with no `repo:` label, a repo on its default branch, and a
-dirty tree. It refuses to start at all if the `code-review` skill is missing, because the prompt
-tells every iteration to review its own work and a missing skill makes that a silent no-op. After
-three failed attempts it labels the ticket `ready-for-human` and moves on.
+dirty tree. After three failed attempts it labels the ticket `ready-for-human` and moves on. It
+warns, but does not refuse, when `tdd` is missing. It no longer checks for `code-review`, because it
+no longer runs it — `bootstrap.sh --check` reports that one instead.
 
 **Where things live.** The queue is `<workspace>/.beads`. Tooling and prompts are in
 `<workspace>/.workspace`. The glossary is `<workspace>/CONTEXT.md`, decisions are

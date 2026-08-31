@@ -131,14 +131,14 @@ stash_debris() {
 # is written with empty fields rather than skipped, so the iteration still shows
 # up and the gap is visible.
 record_cost() {
-  local id="$1" envelope="$2"
+  local id="$1" attempt="$2" envelope="$3"
 
   if [[ ! -s "$COSTS_FILE" ]]; then
     printf 'when\tbead\tattempt\tcost_usd\tin\tout\tcache_read\tcache_write\tsubagents\tturns\tapi_ms\tmodels\n' \
       >"$COSTS_FILE"
   fi
 
-  jq -r --arg when "$(date '+%Y-%m-%d %H:%M:%S')" --arg bead "$id" --arg attempt "$((attempts + 1))" '
+  jq -r --arg when "$(date '+%Y-%m-%d %H:%M:%S')" --arg bead "$id" --arg attempt "$attempt" '
     [ $when, $bead, $attempt,
       (.total_cost_usd // "" | tostring),
       (.usage.input_tokens // "" | tostring),
@@ -151,7 +151,7 @@ record_cost() {
       ((.modelUsage // {}) | keys | join(","))
     ] | @tsv' <<<"$envelope" 2>/dev/null >>"$COSTS_FILE" \
     || printf '%s\t%s\t%s\t\t\t\t\t\t\t\t\t\n' \
-      "$(date '+%Y-%m-%d %H:%M:%S')" "$id" "$((attempts + 1))" >>"$COSTS_FILE"
+      "$(date '+%Y-%m-%d %H:%M:%S')" "$id" "$attempt" >>"$COSTS_FILE"
 
   local cost subagents models
   cost=$(jq -r '.total_cost_usd // "?"' <<<"$envelope" 2>/dev/null || echo '?')
@@ -309,7 +309,7 @@ for ((i = 1; i <= MAX_ITERATIONS; i++)); do
 
   # Absent on a crash, and on any path where claude died before emitting JSON.
   result_text=$(jq -r '.result // empty' <<<"$output" 2>/dev/null || true)
-  record_cost "$id" "$output"
+  record_cost "$id" "$((attempts + 1))" "$output"
 
   if ((claude_exit != 0)); then
     stash_debris "$id" "$repo_path"

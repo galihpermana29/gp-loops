@@ -127,16 +127,18 @@ git-excluded like the starter, so nothing reaches your collaborators until you c
 
 ## 5. The skills
 
-The loop itself needs two:
+The loop itself uses one, and the workflow around it needs a second:
 
 ```bash
-npx skills add mattpocock/skills --skill=code-review -g   # required — the loop refuses to start without it
-npx skills add mattpocock/skills --skill=tdd -g           # optional — shapes how work is approached
+npx skills add mattpocock/skills --skill=tdd -g           # used by the loop — shapes how work is approached
+npx skills add mattpocock/skills --skill=code-review -g   # used by you, per branch, at land time
 ```
 
-`code-review` is not negotiable. The prompt tells every iteration to review its own work before
-promising it is done; without the skill that instruction is a silent no-op and the loop ships
-unreviewed code while reporting success.
+`code-review` is no longer run by the loop, so `ralph.sh` no longer refuses to start without it. It
+is still the thing standing between an unattended loop's output and your default branch — you run it
+once on the accumulated branch diff before landing, which is where `SKILL.md` step 5 puts it. This
+bootstrap check is now the only place that will tell you it is missing, and it will tell you long
+before you need it.
 
 The authoring pipeline needs four more. You can skip these and write tickets by hand:
 
@@ -259,8 +261,10 @@ tickets, the other holds tooling. Nothing in an update, a sync, or even removing
 reads or writes the queue.
 
 Worth doing after any upstream change that touches `ralph.sh`, because that is where the guards live.
-`require_skills()` — the hard stop when `code-review` is missing — reached the template long after
-the first workspaces were created, and none of them had it until they were synced.
+Cost reporting (`costs.tsv`), the `RALPH_MODEL` pin and the orientation inlining all reached the
+template long after the first workspaces were created, and none of them have any of it until they
+are synced — so an unsynced workspace is still paying the old per-bead review cost and cannot tell
+you what it spends.
 
 ## Keeping it recoverable
 

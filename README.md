@@ -33,10 +33,15 @@ stashes partial work when an iteration dies, and gives up on a ticket after thre
 If that trade is not one you want to make on your everyday machine, run it in a container or a
 throwaway VM. This project does not ship one yet.
 
-**It also spends money.** Each iteration is a full Claude Code session that reads the codebase, works,
-runs your suite and reviews its own diff, so it consumes tokens on the scale of a substantial
-session rather than a single question — and `ralph.sh 5` does that five times unattended. Start with
-`ralph.sh 1` and look at your usage before letting it run in double digits.
+**It also spends money.** Each iteration is a full Claude Code session that reads the codebase,
+works and runs your suite, so it consumes tokens on the scale of a substantial session rather than a
+single question — and `ralph.sh 5` does that five times unattended. Start with `ralph.sh 1` and look
+at your usage before letting it run in double digits.
+
+Every iteration writes what it cost to `.workspace/costs.tsv` — tokens, cache, subagents spawned,
+and which model actually ran. Read that file before your second batch. In particular, an unset
+`RALPH_MODEL` means the loop inherits your Claude Code default, so if that is Opus then every
+iteration is an Opus iteration; `RALPH_MODEL=sonnet ./ralph.sh 5` is the knob.
 
 By using this you accept the risk. See [LICENSE](LICENSE) — it is provided as is, with no warranty.
 
@@ -50,7 +55,7 @@ By using this you accept the risk. See [LICENSE](LICENSE) — it is provided as 
 | [beads](https://github.com/gastownhall/beads) (`bd`) | the ticket queue |
 | `git`, `jq` | |
 | zsh or bash | fish works, with one manual step |
-| [`code-review`](https://github.com/mattpocock/skills) | **required** — the loop refuses to start without it |
+| [`code-review`](https://github.com/mattpocock/skills) | strongly recommended — you run it per branch at land time, not in the loop |
 | `grill-with-docs`, `to-spec`, `to-tickets`, `triage`, `tdd` | the authoring pipeline, same source |
 | [`bdui`](https://www.npmjs.com/package/beads-ui) | optional board for writing and triaging tickets |
 
