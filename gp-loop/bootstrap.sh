@@ -432,9 +432,10 @@ else
 fi
 
 # --- 7. skills --------------------------------------------------------------
-# code-review is not optional: the loop refuses to start without it, because the
-# prompt tells every iteration to review its own work and a missing skill makes
-# that instruction a silent no-op.
+# code-review is still checked here even though the loop no longer runs it: the
+# workflow needs it at land time, once per branch, and this is the one place that
+# reports what is installed. It is no longer a hard stop in ralph.sh, so this
+# check is the only thing that will tell you it is missing before you need it.
 echo
 echo "skills"
 REQUIRED=(code-review tdd)

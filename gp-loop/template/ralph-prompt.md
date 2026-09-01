@@ -43,14 +43,25 @@ Do not run `bd show` for your own bead and do not re-read the spec file - you al
 Read the description, the `acceptance` criteria and the spec in full before writing anything.
 The spec is the authority on what "done" means, not your own judgement.
 
-## 2. Search before you build
+## 2. Check what exists before you build
 
-Before writing anything, search this codebase to check the functionality does not already exist.
-Do not assume it is unimplemented.
-Use subagents for the search so you keep your own context for the work.
-Think hard about naming variations before concluding something is missing.
+Building a second copy of something that already exists is the single most common way an
+unattended loop wastes an iteration. So this step is not optional - only its cost is.
 
-This is the single most common way an unattended loop wastes an iteration.
+An **Orientation** section is inlined at the end of this prompt. When it has content, it names
+where the modules for this epic live and what already exists, and it names the commit it was
+accurate at. Somebody established that with a human present, so do not re-establish it:
+
+- If it names what your bead needs, go straight to those paths and read them.
+- If it is silent on something your bead needs, search for that one thing. One `Explore`
+  subagent, one specific question, e.g. "is there an existing X anywhere in this repo?"
+- If a path it names no longer exists, it is stale. Note that on your bead
+  (`bd update <id> --append-notes "orientation stale: ..."`) and then search normally.
+
+When the Orientation section says none was written, search from scratch instead: at most two
+`Explore` subagents, and think hard about naming variations before concluding something is
+missing. Delegate it rather than reading the repo yourself, so your own context stays free for
+the work.
 
 ## 3. Implement
 
@@ -78,7 +89,8 @@ Some repos have no test suite at all. Do not treat that as verification passing.
 Run the strongest check that does exist - a typecheck, a lint, a build - and carry on, but say so
 plainly rather than letting a weaker check stand in silently for a stronger one.
 
-Then run `/code-review` on your work and address what it finds.
+Do not run `/code-review`. Review happens once per branch, at land time, driven by a human -
+not once per bead. Your verification is the check above, and nothing more.
 
 ## 5. Record
 
@@ -86,10 +98,12 @@ Only if verification passed with a zero exit:
 
 1. Commit to the current branch. Write the message in this repo's own convention.
 2. Capture the sha: `git rev-parse HEAD`.
-3. `bd update <id> --append-notes "implemented in <sha>; verified with <the exact command you ran>"`
+3. `bd update <id> --append-notes "implemented in <sha>; verified with <the exact command you ran>; not reviewed"`
    Name the command, not the outcome. `COMPLETE` means different things in a repo with a full suite
    and a repo with only a typecheck, and the person reading this later cannot tell which they got
    unless you write it down. If there was no test suite, say that here too.
+   End with `not reviewed`, because you did not review and the branch review has not happened yet.
+   A closed bead that looks reviewed and is not is the one thing this note exists to prevent.
 4. `bd close <id> --reason="<one line on what landed>"`
 5. Output `<promise>COMPLETE</promise>` as the last line of your response.
 

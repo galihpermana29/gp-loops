@@ -10,6 +10,11 @@
 #   ./ralph.sh [max_iterations]        # default 10
 #   ./ralph.sh --dry-run [max]         # pick and report work, never invoke claude
 #
+# Environment:
+#   RALPH_PROMPT   override the prompt file
+#   RALPH_MODEL    model for every iteration; unset inherits your Claude Code
+#                  default, which is worth checking - see costs.tsv
+#
 set -euo pipefail
 
 # Paths derive from this script's own location, so copying .workspace/ into
@@ -23,8 +28,19 @@ ROOT="$(dirname "$WS")"
 PROMPT_FILE="${RALPH_PROMPT:-$WS/ralph-prompt.md}"
 ATTEMPTS_FILE="$WS/.attempts"
 LOG_DIR="$WS/logs"
+# One row per iteration. The loop's own cost was the one thing it never measured,
+# which is how a month of runs can end in a session limit with nothing to point
+# at. Every claim about what the loop costs should be checkable from this file.
+COSTS_FILE="$WS/costs.tsv"
 QUEUE_LABEL="ready-for-agent"
 MAX_ATTEMPTS=3
+
+# Unset by default rather than pinned. Pinning a cheaper model here would change
+# the quality of everybody's loop on upgrade, silently and without evidence;
+# costs.tsv is the evidence, and `RALPH_MODEL=sonnet` is the fix once you have
+# looked at it. Note that unset means the loop inherits whatever your Claude Code
+# default is - if that is opus, every iteration is an opus iteration.
+MODEL="${RALPH_MODEL:-}"
 
 DRY_RUN=false
 if [[ "${1:-}" == "--dry-run" ]]; then
@@ -36,28 +52,17 @@ MAX_ITERATIONS="${1:-10}"
 mkdir -p "$LOG_DIR"
 touch "$ATTEMPTS_FILE"
 
-# The prompt tells every iteration to review its own work before promising it is
-# done. If that skill is not installed the instruction is silently a no-op, and
-# the loop ships unreviewed code while reporting success. Measured on one real
-# feature, dropping the per-bead review let two functional defects reach the
-# branch. So this is a hard stop rather than a warning: a missing skill is
-# cheap to fix now and expensive to discover later.
+# The loop no longer runs `/code-review`, so it no longer refuses to start
+# without it. Review moved to land time, once per branch, because the loop
+# commits per bead and reviewing per bead paid for the same two agents on every
+# one - sixteen times on a sixteen-bead epic, for a diff that lands as one.
+# `bootstrap.sh --check` still reports the skill, since the workflow needs it,
+# just later and driven by a human.
 #
-# `tdd` only shapes how work is approached, so its absence is worth saying out
-# loud but is not worth refusing over.
+# `tdd` shapes how work is approached and spawns no subagents, so it is free and
+# stays. Its absence is worth saying out loud but not worth refusing over.
 require_skills() {
-  local missing=() s
-  for s in code-review; do
-    [[ -e "$HOME/.claude/skills/$s" ]] || missing+=("$s")
-  done
-  if ((${#missing[@]})); then
-    printf 'gp-loop: required skill(s) not installed: %s\n' "${missing[*]}" >&2
-    printf 'Install with:\n' >&2
-    for s in "${missing[@]}"; do
-      printf '  npx skills add mattpocock/skills --skill=%s\n' "$s" >&2
-    done
-    exit 1
-  fi
+  local s
   for s in tdd; do
     [[ -e "$HOME/.claude/skills/$s" ]] \
       || printf 'gp-loop: warning - %s is not installed; the loop will skip it\n' "$s" >&2
@@ -111,6 +116,48 @@ stash_debris() {
   else
     log "WARNING: could not stash $id's partial work; the retry will hit the dirty-tree guard"
   fi
+}
+
+# One tab-separated row per iteration, appended.
+#
+# `subagents` is the column worth watching. The loop's own prompt tells each
+# iteration to delegate its codebase search, and nothing ever counted how wide
+# that went - so a single bead could quietly fan out into several full-repo
+# sweeps, each paying its own cold start. `models` is here because an unset
+# RALPH_MODEL inherits your Claude Code default, and finding out from this file
+# that every iteration ran on opus is the whole point.
+#
+# Costs nothing when the envelope is unparseable (a crash before JSON): the row
+# is written with empty fields rather than skipped, so the iteration still shows
+# up and the gap is visible.
+record_cost() {
+  local id="$1" attempt="$2" envelope="$3"
+
+  if [[ ! -s "$COSTS_FILE" ]]; then
+    printf 'when\tbead\tattempt\tcost_usd\tin\tout\tcache_read\tcache_write\tsubagents\tturns\tapi_ms\tmodels\n' \
+      >"$COSTS_FILE"
+  fi
+
+  jq -r --arg when "$(date '+%Y-%m-%d %H:%M:%S')" --arg bead "$id" --arg attempt "$attempt" '
+    [ $when, $bead, $attempt,
+      (.total_cost_usd // "" | tostring),
+      (.usage.input_tokens // "" | tostring),
+      (.usage.output_tokens // "" | tostring),
+      (.usage.cache_read_input_tokens // "" | tostring),
+      (.usage.cache_creation_input_tokens // "" | tostring),
+      (.subagent_stats.spawned // "" | tostring),
+      (.num_turns // "" | tostring),
+      (.duration_api_ms // "" | tostring),
+      ((.modelUsage // {}) | keys | join(","))
+    ] | @tsv' <<<"$envelope" 2>/dev/null >>"$COSTS_FILE" \
+    || printf '%s\t%s\t%s\t\t\t\t\t\t\t\t\t\n' \
+      "$(date '+%Y-%m-%d %H:%M:%S')" "$id" "$attempt" >>"$COSTS_FILE"
+
+  local cost subagents models
+  cost=$(jq -r '.total_cost_usd // "?"' <<<"$envelope" 2>/dev/null || echo '?')
+  subagents=$(jq -r '.subagent_stats.spawned // "?"' <<<"$envelope" 2>/dev/null || echo '?')
+  models=$(jq -r '(.modelUsage // {}) | keys | join(",")' <<<"$envelope" 2>/dev/null || echo '?')
+  log "cost \$$cost | subagents $subagents | models ${models:-?}"
 }
 
 record_failure() {
@@ -217,6 +264,21 @@ for ((i = 1; i <= MAX_ITERATIONS; i++)); do
     [[ -z "$spec_body" ]] && log "WARNING: design names $spec_rel but no such file; agent will work without it"
   fi
 
+  # Sits beside the spec so it travels with the epic it describes. Absent is
+  # fine: the prompt falls back to searching the repo from scratch, which is what
+  # every iteration used to do.
+  orientation_body=""
+  if [[ -n "$spec_rel" ]]; then
+    for candidate in "$ROOT/$(dirname "$spec_rel")/orientation.md" \
+      "$repo_path/$(dirname "$spec_rel")/orientation.md"; do
+      if [[ -f "$candidate" ]]; then
+        orientation_body=$(cat "$candidate")
+        log "inlined orientation $candidate ($(wc -l <"$candidate" | tr -d ' ') lines)"
+        break
+      fi
+    done
+  fi
+
   prompt=$(
     cat "$PROMPT_FILE"
     printf '\n\n---\n\nThe bead you are working on this iteration is **%s** in repo **%s**.\nThe workspace root is `%s`, so `bd` means `bd -C %s`.\n' \
@@ -225,15 +287,29 @@ for ((i = 1; i <= MAX_ITERATIONS; i++)); do
     if [[ -n "$spec_body" ]]; then
       printf '\n## Spec (%s)\n\n%s\n' "$spec_rel" "$spec_body"
     fi
+    if [[ -n "$orientation_body" ]]; then
+      printf '\n## Orientation\n\n%s\n' "$orientation_body"
+    else
+      printf '\n## Orientation\n\nNone written for this epic. Search the codebase from scratch, as section 2 describes.\n'
+    fi
   )
 
   set +e
+  # JSON rather than text so the iteration reports what it cost. The completion
+  # promise now lives in `.result`, so it is extracted rather than grepped out of
+  # the whole envelope - grepping the raw JSON would also match the promise if the
+  # agent merely quoted it while explaining itself.
   output=$(cd "$repo_path" && printf '%s' "$prompt" \
-    | claude --dangerously-skip-permissions --print 2>&1)
+    | claude --dangerously-skip-permissions --print --output-format json \
+      ${MODEL:+--model "$MODEL"} 2>&1)
   claude_exit=$?
   set -e
 
   printf '%s\n' "$output" >"$logfile"
+
+  # Absent on a crash, and on any path where claude died before emitting JSON.
+  result_text=$(jq -r '.result // empty' <<<"$output" 2>/dev/null || true)
+  record_cost "$id" "$((attempts + 1))" "$output"
 
   if ((claude_exit != 0)); then
     stash_debris "$id" "$repo_path"
@@ -251,7 +327,7 @@ for ((i = 1; i <= MAX_ITERATIONS; i++)); do
     continue
   fi
 
-  if grep -q '<promise>COMPLETE</promise>' <<<"$output"; then
+  if grep -q '<promise>COMPLETE</promise>' <<<"$result_text"; then
     log "DONE $id (log: $logfile)"
     # A promise is only honest if the iteration also committed. Anything left
     # behind means it verified, promised, and then failed to record — so the
